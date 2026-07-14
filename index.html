@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intercambio Familiar</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f9; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        select, button { width: 100%; padding: 10px; margin-top: 10px; font-size: 16px; border-radius: 5px; }
+        button { background-color: #28a745; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #218838; }
+        .hidden { display: none; }
+        .admin-panel { margin-top: 30px; border-top: 2px dashed #ccc; padding-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>🎄 Intercambio Familiar 🎄</h2>
+        
+        <div id="fase1" class="hidden">
+            <h3>Paso 1: ¿Quieres cambiar tu amigo secreto?</h3>
+            <label>¿Quién eres?</label>
+            <select id="yoSoyFase1"></select>
+
+            <label>¿Deseas participar en el nuevo sorteo (cambiar de persona)?</label>
+            <select id="quiereCambiar" onchange="toggleReceptor()">
+                <option value="si">Sí, quiero que me asignen a otra persona al azar</option>
+                <option value="no">No, me quiero quedar con la persona que ya tenía</option>
+            </select>
+
+            <div id="divReceptor" class="hidden">
+                <label>¿A quién le vas a dar? (Selecciona para mantenerlo en secreto)</label>
+                <select id="miReceptor"></select>
+            </div>
+
+            <button onclick="registrarDecision()">Guardar mi decisión</button>
+        </div>
+
+        <div id="fase2" class="hidden">
+            <h3>Paso 2: ¡Sorteo Realizado!</h3>
+            <label>¿Quién eres?</label>
+            <select id="yoSoyFase2"></select>
+            <button onclick="consultarSorteo()">Ver a quién le regalo</button>
+            <h3 id="resultado" style="color: #d9534f; margin-top: 20px;"></h3>
+        </div>
+
+        <div class="admin-panel">
+            <h4>Panel de Administrador (Solo Pablo Jose)</h4>
+            <label>Tu contraseña de Admin (Tu nombre exacto):</label>
+            <select id="adminUser"></select>
+            <button style="background-color: #007bff;" onclick="ejecutarSorteo()">Ejecutar Sorteo (Pasar a Fase 2)</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = ""; // Si lo subes a Replit/Glitch, pon aquí la URL. Vacío sirve para local.
+
+        async function cargarEstado() {
+            const res = await fetch(`${API_URL}/estado`);
+            const data = await res.json();
+            
+            llenarSelects(data.participantes);
+
+            if (data.fase === 1) {
+                document.getElementById('fase1').classList.remove('hidden');
+            } else {
+                document.getElementById('fase1').classList.add('hidden');
+                document.getElementById('fase2').classList.remove('hidden');
+            }
+        }
+
+        function llenarSelects(participantes) {
+            const selects = ['yoSoyFase1', 'miReceptor', 'yoSoyFase2', 'adminUser'];
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                el.innerHTML = '<option value="">Selecciona tu nombre...</option>';
+                participantes.forEach(p => {
+                    el.innerHTML += `<option value="${p}">${p}</option>`;
+                });
+            });
+        }
+
+        function toggleReceptor() {
+            const quiereCambiar = document.getElementById('quiereCambiar').value;
+            if (quiereCambiar === 'no') {
+                document.getElementById('divReceptor').classList.remove('hidden');
+            } else {
+                document.getElementById('divReceptor').classList.add('hidden');
+            }
+        }
+
+        async function registrarDecision() {
+            const dador = document.getElementById('yoSoyFase1').value;
+            const quiereCambiar = document.getElementById('quiereCambiar').value === 'si';
+            const receptor = document.getElementById('miReceptor').value;
+
+            if (!dador) return alert("Por favor, selecciona quién eres.");
+            if (!quiereCambiar && !receptor) return alert("Debes indicar a quién le vas a dar si no quieres cambiar.");
+            if (!quiereCambiar && dador === receptor) return alert("No te puedes regalar a ti mismo.");
+
+            const res = await fetch(`${API_URL}/registrar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dador, quiereCambiar, receptor })
+            });
+            const data = await res.json();
+            alert(data.mensaje || data.error);
+        }
+
+        async function ejecutarSorteo() {
+            const adminUser = document.getElementById('adminUser').value;
+            if (adminUser !== "Pablo Jose") return alert("Solo Pablo Jose puede ejecutar el sorteo.");
+
+            const res = await fetch(`${API_URL}/admin/sorteo`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adminUser })
+            });
+            const data = await res.json();
+            alert(data.mensaje || data.error);
+            location.reload(); // Recargar para mostrar la Fase 2
+        }
+
+        async function consultarSorteo() {
+            const nombre = document.getElementById('yoSoyFase2').value;
+            if (!nombre) return alert("Selecciona tu nombre primero.");
+
+            const res = await fetch(`${API_URL}/consultar/${nombre}`);
+            const data = await res.json();
+            
+            if (data.receptor) {
+                document.getElementById('resultado').innerText = `Te toca darle el regalo a: ${data.receptor}`;
+            } else {
+                alert(data.error);
+            }
+        }
+
+        cargarEstado();
+    </script>
+</body>
+</html>
